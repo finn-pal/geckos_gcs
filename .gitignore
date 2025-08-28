@@ -1,0 +1,5 @@
+# Ignore the renv directory and lock file
+.venv/
+notebooks/
+nuke/
+.vscode/

@@ -1,0 +1,11 @@
+All band information presented in:
+- "bands.json"
+- "solar_lum.json"
+was obstained from:
+https://www.sciencedirect.com/science/article/pii/S0019103516301014
+
+Data presented in:
+- "kroupa_columns.json"
+- "kroupa_mlr_uni.txt"
+was obstained from:
+https://research.iac.es/proyecto/miles/pages/predicted-masses-and-photometric-observables-based-on-photometric-libraries.php

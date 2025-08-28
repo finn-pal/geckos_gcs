@@ -1,0 +1,30 @@
+{
+    "U": {
+        "effective_wavelength": 0.360,
+        "FWHM": 0.068
+    },
+    "B": {
+        "effective_wavelength": 0.436,
+        "FWHM": 0.098
+    },
+    "V": {
+        "effective_wavelength": 0.549,
+        "FWHM": 0.086
+    },
+    "Rj": {
+        "effective_wavelength": 0.700,
+        "FWHM": 0.209
+    },
+    "Ij": {
+        "effective_wavelength": 0.900,
+        "FWHM": 0.221
+    },
+    "R": {
+        "effective_wavelength": 0.641,
+        "FWHM": 0.158
+    },
+    "I": {
+        "effective_wavelength": 0.798,
+        "FWHM": 0.154
+    }
+}
