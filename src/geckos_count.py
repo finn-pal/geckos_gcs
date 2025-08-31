@@ -511,7 +511,7 @@ if __name__ == "__main__":
     parser.add_argument("-l", "--location", required=False, type=str, help="data location", default="local")
 
     parser.add_argument("-a", "--iteration", required=False, type=int, help="sim iteration", default=0)
-    parser.add_argument("-b", "--snapshot", required=False, type=int, help="sim snapshot", default=600)
+    parser.add_argument("-c", "--snapshot", required=False, type=int, help="sim snapshot", default=600)
 
     parser.add_argument("-p", "--phi", required=False, type=int, help="azimuthal angle", default=0)
     parser.add_argument("-i", "--inclination", required=False, type=int, help="inclination", default=90)

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#PBS -N create_hdf5
+#PBS -l select=1:ncpus=1:mem=16gb
+#PBS -l walltime=12:00:00
+#PBS -M f.pal@unsw.edu.au
+#PBS -m bae
+#PBS -j oe
+#PBS -o ../reports/output_reports
+#PBS -e ../reports/error_reports
+
+cd $PBS_O_WORKDIR
+source ../my_env/bin/activate
+
+python3 ../src/combine_iterations.py --simulation=m12i --galaxy=NGC3957 --location=katana --it_low_limit=0 --it_up_limit=100
