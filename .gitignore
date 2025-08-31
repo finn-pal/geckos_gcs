@@ -1,5 +1,6 @@
 # Ignore the renv directory and lock file
-.venv/
+.venv311/
+.venv312/
 notebooks/
 nuke/
 .vscode/

@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import time
 
 import astropy.units as u
 import gc_utils
@@ -495,7 +496,7 @@ def convert_ndarrays(obj):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-s", "--simulation", required=True, type=str, help="simulation name (e.g. m12i)")
-    parser.add_argument("-g", "--galaxy", required=True, type=str, help="gexkos galaxy name (e.g. NGC3221)")
+    parser.add_argument("-g", "--galaxy", required=True, type=str, help="gexkos galaxy name (e.g. NGC3957)")
     parser.add_argument("-l", "--location", required=False, type=str, help="data location", default="local")
 
     parser.add_argument("-a", "--iteration", required=False, type=int, help="sim iteration", default=0)
@@ -515,7 +516,6 @@ if __name__ == "__main__":
     inc = args.inclination
 
     gal = args.galaxy
-    gal_loc = args.gal_loc
 
     sim_dir = get_dir(loc, "simulation")
     gal_dir = get_dir(loc, "galaxy")
@@ -523,8 +523,13 @@ if __name__ == "__main__":
     print("Retrieving " + gal + " on " + sim)
     print("it: " + str(it) + ", snap: " + str(snap) + ", phi: " + str(phi) + ", i: " + str(inc))
 
+    start_time = time.time()
+
     gc_dict = process_data(sim, sim_dir, gal, gal_dir, it, snap, phi, inc)
     gc_dict_serializable = convert_ndarrays(gc_dict)
+
+    end_time = time.time()
+    print("time:", np.round((end_time - start_time) / 60, 2), "m")
 
     save_dir = gal_dir + gal + "/" + sim  # save location
     it_dir = save_dir + "/" + "iterations"
