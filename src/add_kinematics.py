@@ -1,125 +1,145 @@
+import argparse
+import json
+import os
+
 import agama
+import gc_utils
+import h5py
 import numpy as np
 
-agama.setUnits(length=1, velocity=1, mass=1)
 
+def get_dir(loc_: str, file_type: str):
+    if file_type == "simulation":
+        if loc_ == "local":
+            dir_ = "../../simulations/"
+        elif loc_ == "katana":
+            dir_ = "/srv/scratch/astro/z5114326/simulations/"
+        elif loc_ == "expansion":
+            dir_ = "/Volumes/Expansion/simulations/"
+        else:
+            raise RuntimeError("Incorrect simulation location provided. Must be local, katana or expansion")
 
-# need to get velocities and circularities
+    elif file_type == "galaxy":
+        if loc_ == "local":
+            dir_ = "../../geckos/"
+        elif loc_ == "katana":
+            dir_ = "/srv/scratch/astro/z5114326/geckos/"
+        elif loc_ == "expansion":
+            dir_ = "/Volumes/Expansion/geckos/"
+        else:
+            raise RuntimeError("Incorrect galaxy location provided. Must be local, katana or expansion")
 
-
-def convert_to_coords(init_cond, coord="cylindrical"):
-    """
-    Convert Cartesian initial conditions to cylindrical or spherical coordinates.
-
-    Parameters:
-        init_cond : ndarray of shape (N, 6)
-            Each row: [x, y, z, vx, vy, vz]
-        coord : str
-            Either 'cylindrical' or 'spherical'
-
-    Returns:
-        coords : ndarray of shape (N, 6)
-            Cylindrical: [R, phi, z, v_R, v_phi, v_z]
-            Spherical:   [r, theta, phi, v_r, v_theta, v_phi]
-    """
-    x, y, z = init_cond[:, 0], init_cond[:, 1], init_cond[:, 2]
-    vx, vy, vz = init_cond[:, 3], init_cond[:, 4], init_cond[:, 5]
-
-    if coord == "cylindrical":
-        R = np.hypot(x, y)
-        phi = np.arctan2(y, x)
-        v_R = (x * vx + y * vy) / R
-        v_phi = (-y * vx + x * vy) / R
-        return np.column_stack((R, phi, z, v_R, v_phi, vz))
-
-    elif coord == "spherical":
-        r = np.sqrt(x**2 + y**2 + z**2)
-        theta = np.arccos(z / r)  # polar angle
-        phi = np.arctan2(y, x)
-
-        # Unit vectors
-        r_hat = np.stack((x, y, z), axis=1) / r[:, None]
-        theta_hat = np.stack(
-            (
-                x * z / (r**2 * np.sqrt(x**2 + y**2)),
-                y * z / (r**2 * np.sqrt(x**2 + y**2)),
-                -np.sqrt(x**2 + y**2) / r**2,
-            ),
-            axis=1,
-        )
-        phi_hat = np.stack((-y, x, np.zeros_like(z)), axis=1) / (x**2 + y**2)[:, None] ** 0.5
-
-        vel = np.stack((vx, vy, vz), axis=1)
-
-        v_r = np.sum(vel * r_hat, axis=1)
-        v_theta = np.sum(vel * theta_hat, axis=1)
-        v_phi = np.sum(vel * phi_hat, axis=1)
-
-        return np.column_stack((r, theta, phi, v_r, v_theta, v_phi))
+    elif file_type == "data":
+        if loc_ == "local":
+            dir_ = "data/"
+        elif loc_ == "katana":
+            dir_ = "/srv/scratch/astro/z5114326/geckos_gcs/data/"
+        elif loc_ == "expansion":
+            dir_ = "/Volumes/Expansiongeckos_gcs/data/"
+        else:
+            raise RuntimeError("Incorrect galaxy location provided. Must be local, katana or expansion")
 
     else:
-        raise ValueError("coord must be 'cylindrical' or 'spherical'")
+        raise RuntimeError("Incorrect file_type provided. Must be sim or gal")
+
+    return dir_
 
 
-def get_orbits(
-    df,
-    POTENTIAL_TYPE="PriceWhelan22.ini",
-    SAVE_TABLE_NAME="orbit_table_full",
-    DATA_FOLDER="data/",
-    POTENTIAL_FOLDER="potentials/",
+def add_data(
+    proc_data,
+    gec_data,
+    snap: int,
+    it_lst: list[int],
 ):
     # NEED TO UPDATE TO ACCOUNT FOR GECKOS FORMAT
-
-    ic_car = np.vstack((df["x_gc"], df["y_gc"], df["z_gc"], df["u"], df["v"], df["w"])).T
-    ic_cyl = convert_to_coords(ic_car, coord="cylindrical")
-    ic_sph = convert_to_coords(ic_car, coord="spherical")
-
-    lx = ic_car[:, 1] * ic_car[:, 5] - ic_car[:, 2] * ic_car[:, 4]
-    ly = ic_car[:, 2] * ic_car[:, 3] - ic_car[:, 0] * ic_car[:, 5]
-    lz = ic_car[:, 0] * ic_car[:, 4] - ic_car[:, 1] * ic_car[:, 3]
-    ltot = np.linalg.norm((lx, ly, lz), axis=0)
-
-    inc = np.degrees(np.arccos(lz / ltot))
-
-    eccentricity = (df["r_apo"] - df["r_per"]) / (df["r_apo"] + df["r_per"])
-
-    pot_file = POTENTIAL_FOLDER + POTENTIAL_TYPE
+    agama.setUnits(length=1, velocity=1, mass=1)
+    pot_file = sim_dir + sim + "/potentials/snap_%d/combined_snap_%d.ini" % (snap, snap)
     pot = agama.Potential(pot_file)
-    af = agama.ActionFinder(pot, interp=False)
 
-    ioms = af(ic_car)
-    jr = ioms[:, 0]
-    jz = ioms[:, 1]
-    jphi = ioms[:, 2]
+    snap_id = gc_utils.snapshot_name(snap)
+    for it in it_lst:
+        it_id = gc_utils.iteration_name(it)
+        snp_dat = proc_data[it_id]["snapshots"][snap_id]
+        pos_xyz = snp_dat["pos.xyz"][()]
+        vel_xyz = snp_dat["vel.xyz"][()]
 
-    jtot = jr + np.abs(jphi) + jz
+        eccentricity = snp_dat["ecc"][()]
+        circ = snp_dat["lz_norm"][()]
 
-    ek = 0.5 * np.linalg.norm(ic_car[:, 3:], axis=1) ** 2
-    ep = pot.potential(ic_car[:, :3])
-    et = ep + ek
+        ic_car = np.hstack((pos_xyz, vel_xyz))
+        orbits = agama.orbit(potential=pot, ic=ic_car, time=10 * pot.Tcirc(ic_car), trajsize=10000)
 
-    r_circs = pot.Rcirc(E=et)
-    xyz = np.column_stack((r_circs, r_circs * 0, r_circs * 0))
-    v_circs = np.sqrt(-r_circs * pot.force(xyz)[:, 0])
-    vel = np.column_stack((v_circs * 0, v_circs, v_circs * 0))
-    init_conds = np.concatenate((xyz, vel), axis=1)
-    lz_circ = af(init_conds)[:, 2]
+        max_z = []
+        for orbit in orbits:
+            max_z.append(np.max(np.abs(orbit[1][:, 2])))
+        max_z = np.array(max_z)
 
-    circ = lz / lz_circ
+        # addition of 0.01 as sometimes rounding error lead to max_z not being max point
+        check_z = np.abs(ic_car[:, 2]) > max_z + 0.01
+        if len(np.where(check_z)[0]) > 0:
+            raise ValueError("Issues with z_max")
 
-    check_sign = np.sign(ic_cyl[:, 4]) == np.sign(jphi)
-    if len(np.where(~check_sign)[0]) > 0:
-        raise ValueError("Vphi and Jphi of different signs.")
+        # z_flag = (np.abs(ic_car[:, 2]) > np.array(max_z)).astype(int)
 
-    orbits = agama.orbit(potential=pot, ic=ic_car, time=10 * pot.Tcirc(ic_car), trajsize=10000)
-    max_z = []
-    for orbit in orbits:
-        max_z.append(np.max(np.abs(orbit[1][:, 2])))
+        # add to hdf5
+        if it_id in gec_data.keys():
+            it_grouping = gec_data[it_id]
+        else:
+            it_grouping = gec_data.create_group(it_id)
 
-    check_z = np.abs(ic_car[:, 2]) > np.array(max_z)
-    if len(np.where(check_z)[0]) > 0:
-        raise ValueError("Issues with z_max")
+        prop_lst = ["circ", "eccentricity", "max_z", "max_z_flag"]
+        for prop in prop_lst:
+            if prop in it_grouping.keys():
+                del it_grouping[prop]
+
+        it_grouping.create_dataset("circ", data=circ)
+        it_grouping.create_dataset("eccentricity", data=eccentricity)
+        it_grouping.create_dataset("max_z", data=max_z)
+        # it_grouping.create_dataset("max_z_flag", data=z_flag)
+
+    gec_data.close()
+    proc_data.close()
 
 
-# df = orbit_param()
-# get_orbits(df, POTENTIAL_TYPE = "PriceWhelan22.ini")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--simulation", required=True, type=str, help="simulation name (e.g. m12i)")
+    parser.add_argument("-g", "--galaxy", required=True, type=str, help="gexkos galaxy name (e.g. NGC3957)")
+    parser.add_argument("-l", "--location", required=False, type=str, help="data location", default="local")
+
+    parser.add_argument("-a", "--it_low_limit", required=False, type=int, help="lower bound it", default=0)
+    parser.add_argument("-b", "--it_up_limit", required=False, type=int, help="upper bound it", default=100)
+    parser.add_argument("-c", "--snapshot", required=False, type=int, help="sim snapshot", default=600)
+
+    parser.add_argument("-p", "--phi", required=False, type=int, help="azimuthal angle", default=0)
+    parser.add_argument("-i", "--inclination", required=False, type=int, help="inclination", default=90)
+
+    args = parser.parse_args()
+
+    sim = args.simulation
+    loc = args.location
+    it_min = args.it_low_limit
+    it_max = args.it_up_limit
+    snap = args.snapshot
+
+    phi = args.phi
+    inc = args.inclination
+
+    gal = args.galaxy
+
+    sim_dir = get_dir(loc, "simulation")
+    gal_dir = get_dir(loc, "galaxy")
+
+    snap_id = gc_utils.snapshot_name(snap)
+    it_lst = np.arange(it_min, it_max + 1, dtype=int)
+
+    save_dir = gal_dir + gal + "/" + sim  # save location
+    it_dir = save_dir + "/" + "iterations"
+
+    gec_file = save_dir + "/" + sim + "_" + gal + "_" + snap_id + "_p" + str(phi) + "_i" + str(inc) + ".hdf5"
+    gec_data = h5py.File(gec_file, "a")  # open processed data file
+
+    proc_file = sim_dir + sim + "/" + sim + "_processed.hdf5"
+    proc_data = h5py.File(proc_file, "r")  # open processed data file
+
+    add_data(proc_data, gec_data, snap, it_lst)
