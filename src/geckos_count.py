@@ -34,6 +34,16 @@ def get_dir(loc_: str, file_type: str):
         else:
             raise RuntimeError("Incorrect galaxy location provided. Must be local, katana or expansion")
 
+    elif file_type == "data":
+        if loc_ == "local":
+            dir_ = "data/"
+        elif loc_ == "katana":
+            dir_ = "/srv/scratch/astro/z5114326/geckos_gcs/data/"
+        elif loc_ == "expansion":
+            dir_ = "/Volumes/Expansiongeckos_gcs/data/"
+        else:
+            raise RuntimeError("Incorrect galaxy location provided. Must be local, katana or expansion")
+
     else:
         raise RuntimeError("Incorrect file_type provided. Must be sim or gal")
 
@@ -179,10 +189,10 @@ def get_spatial_mask(gc_pos_rot, field_dict):
 # GC Magnitude Masking ###############################################################################
 
 
-def gc_m_abs(gc_dict):
+def gc_m_abs(gc_dict, dat_dir):
     # https://www.sciencedirect.com/science/article/pii/S0019103516301014
 
-    solar_path = "data/solar_lum.json"
+    solar_path = dat_dir + "solar_lum.json"
     with open(solar_path, "r") as f:
         solar_dict = json.load(f)
 
@@ -203,15 +213,15 @@ def gc_m_abs(gc_dict):
     return gc_dict
 
 
-def get_luminosity(gc_dict: dict, bands: list[str] = ["I", "R"]):
+def get_luminosity(gc_dict: dict, dat_dir: str, bands: list[str] = ["I", "R"]):
     band_lst = ["U", "B", "V", "R", "I", "J", "H", "K"]
 
     for band in bands:
         if band not in band_lst:
             raise Warning("Band not found")
 
-    kroupa_mlr_uni = "data/kroupa_mlr_uni.txt"
-    kroupa_col = "data/kroup_columns.json"
+    kroupa_mlr_uni = dat_dir + "kroupa_mlr_uni.txt"
+    kroupa_col = dat_dir + "kroup_columns.json"
     with open(kroupa_col, "r") as f:
         col_dict = json.load(f)
 
@@ -248,7 +258,7 @@ def get_luminosity(gc_dict: dict, bands: list[str] = ["I", "R"]):
         gc_dict[lum_var] = lum_band
 
     gc_dict["bands"] = bands
-    gc_dict = gc_m_abs(gc_dict)
+    gc_dict = gc_m_abs(gc_dict, dat_dir)
 
     return gc_dict
 
@@ -323,12 +333,12 @@ def k_prime(wavelength: float, R_Vprime: float = 4.05):
     return k_p
 
 
-def get_extinction(E_BV: float, band: str):
+def get_extinction(E_BV: float, dat_dir: str, band: str):
     # https://ui.adsabs.harvard.edu/abs/2000ApJ...533..682C/abstract
     # https://www.oxfordreference.com/display/10.1093/acref/9780199609055.001.0001/acref-9780199609055-e-2038
     # https://www.sciencedirect.com/science/article/pii/S0019103516301014
 
-    bands_path = "data/bands.json"
+    bands_path = dat_dir + "bands.json"
     with open(bands_path, "r") as f:
         bands_dict = json.load(f)
 
@@ -341,7 +351,7 @@ def get_extinction(E_BV: float, band: str):
     return A
 
 
-def get_magnitudes(part, gc_dict, field_dict, phi, inc, bands: list[str] = ["I", "R"]):
+def get_magnitudes(part, gc_dict, field_dict, phi, inc, dat_dir: str, bands: list[str] = ["I", "R"]):
     observer = np.array([field_dict["gal_dis_kpc"], 0, 0])
     # dist_pc = field_dict["gal_dis_kpc"] * 1000
 
@@ -349,7 +359,7 @@ def get_magnitudes(part, gc_dict, field_dict, phi, inc, bands: list[str] = ["I",
     op_dist_kpc = np.linalg.norm(observer - gc_pos_rot)
     op_dist_pc = op_dist_kpc * 1000
 
-    gc_dict = get_luminosity(gc_dict, bands)
+    gc_dict = get_luminosity(gc_dict, dat_dir, bands)
 
     for band in gc_dict["bands"]:
         m_abs_var = "m_abs_pre_ex_" + band
@@ -366,7 +376,7 @@ def get_magnitudes(part, gc_dict, field_dict, phi, inc, bands: list[str] = ["I",
         A_lst = []
         for poi in gc_pos_rot:
             EB_V = dust(part, observer, poi, phi, inc)
-            A = get_extinction(EB_V, band)
+            A = get_extinction(EB_V, dat_dir, band)
             A_lst.append(A)
         A_lst = np.array(A_lst)
 
@@ -452,6 +462,7 @@ def process_data(
     sim_dir: str,
     gal: str,
     gal_dir: str,
+    dat_dir: str,
     it: int,
     snap: int,
     phi: float,
@@ -469,7 +480,7 @@ def process_data(
     field_dict = get_field(gal, gal_dir)
     gc_dict["pos_msk"] = get_spatial_mask(gc_dict["pos_rot"], field_dict)
 
-    gc_dict = get_magnitudes(part, gc_dict, field_dict, phi, inc, bands)
+    gc_dict = get_magnitudes(part, gc_dict, field_dict, phi, inc, dat_dir, bands)
     gc_dict = get_mag_mask(gc_dict, mag_lim, band=mag_lim_band, extinction=True)
 
     return gc_dict
@@ -519,17 +530,18 @@ if __name__ == "__main__":
 
     sim_dir = get_dir(loc, "simulation")
     gal_dir = get_dir(loc, "galaxy")
+    dat_dir = get_dir(loc, "data")
 
     print("Retrieving " + gal + " on " + sim)
     print("it: " + str(it) + ", snap: " + str(snap) + ", phi: " + str(phi) + ", i: " + str(inc))
 
     start_time = time.time()
 
-    gc_dict = process_data(sim, sim_dir, gal, gal_dir, it, snap, phi, inc)
+    gc_dict = process_data(sim, sim_dir, gal, gal_dir, dat_dir, it, snap, phi, inc)
     gc_dict_serializable = convert_ndarrays(gc_dict)
 
     end_time = time.time()
-    print("time:", np.round((end_time - start_time) / 60, 2), "m")
+    print("time:", np.round((end_time - start_time) / 60, 2), "min")
 
     save_dir = gal_dir + gal + "/" + sim  # save location
     it_dir = save_dir + "/" + "iterations"
