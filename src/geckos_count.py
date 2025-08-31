@@ -414,7 +414,7 @@ def get_gc_properties(sim, sim_dir, it, snap):
     gcids_snp = snap_dat["gc_id"][()]
     mass_snp = 10 ** snap_dat["mass"][()]
     pos_xyz_snp = snap_dat["pos.xyz"][()]
-    circ_snp = snap_dat["lz_norm"][()]
+    # circ_snp = snap_dat["lz_norm"][()] # remove for katana
     group_snp = snap_dat["group_id"][()]
     acc_snp = np.array([0 if group == 0 else 1 for group in group_snp])
 
@@ -439,7 +439,7 @@ def get_gc_properties(sim, sim_dir, it, snap):
         "mass": mass_snp,
         "feh": np.array(feh_lst),
         "age": np.array(age_lst),
-        "circ": circ_snp,
+        # "circ": circ_snp,
         "pos": pos_xyz_snp,
         "acc": acc_snp,
     }
