@@ -45,12 +45,7 @@ def get_dir(loc_: str, file_type: str):
     return dir_
 
 
-def add_data(
-    proc_data,
-    gec_data,
-    snap: int,
-    it_lst: list[int],
-):
+def add_data(proc_data, gec_data, snap: int, it_lst: list[int], z_thick: float = 1.1, z_sig: float = 3):
     # NEED TO UPDATE TO ACCOUNT FOR GECKOS FORMAT
     agama.setUnits(length=1, velocity=1, mass=1)
     pot_file = sim_dir + sim + "/potentials/snap_%d/combined_snap_%d.ini" % (snap, snap)
@@ -81,13 +76,15 @@ def add_data(
 
         # z_flag = (np.abs(ic_car[:, 2]) > np.array(max_z)).astype(int)
 
+        disk_flag = np.abs(max_z) <= z_thick * z_sig
+
         # add to hdf5
         if it_id in gec_data.keys():
             it_grouping = gec_data[it_id]
         else:
             it_grouping = gec_data.create_group(it_id)
 
-        prop_lst = ["circ", "eccentricity", "max_z", "max_z_flag"]
+        prop_lst = ["circ", "eccentricity", "max_z", "max_z_flag", "disk_flag"]
         for prop in prop_lst:
             if prop in it_grouping.keys():
                 del it_grouping[prop]
@@ -96,6 +93,7 @@ def add_data(
         it_grouping.create_dataset("eccentricity", data=eccentricity)
         it_grouping.create_dataset("max_z", data=max_z)
         # it_grouping.create_dataset("max_z_flag", data=z_flag)
+        it_grouping.create_dataset("disk_flag", data=disk_flag)
 
     gec_data.close()
     proc_data.close()
