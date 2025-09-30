@@ -424,6 +424,7 @@ def get_gc_properties(sim, sim_dir, it, snap):
     gcids_snp = snap_dat["gc_id"][()]
     mass_snp = 10 ** snap_dat["mass"][()]
     pos_xyz_snp = snap_dat["pos.xyz"][()]
+    vel_xyz_snp = snap_dat["vel.xyz"][()]
     # circ_snp = snap_dat["lz_norm"][()] # remove for katana
     group_snp = snap_dat["group_id"][()]
     acc_snp = np.array([0 if group == 0 else 1 for group in group_snp])
@@ -451,6 +452,7 @@ def get_gc_properties(sim, sim_dir, it, snap):
         "age": np.array(age_lst),
         # "circ": circ_snp,
         "pos": pos_xyz_snp,
+        "vel": vel_xyz_snp,
         "acc": acc_snp,
     }
 
@@ -476,6 +478,7 @@ def process_data(
 
     gc_dict = get_gc_properties(sim, sim_dir, it, snap)
     gc_dict["pos_rot"] = rotate(gc_dict["pos"], phi, inc)
+    gc_dict["vel_rot"] = rotate(gc_dict["vel"], phi, inc)
 
     field_dict = get_field(gal, gal_dir)
     gc_dict["pos_msk"] = get_spatial_mask(gc_dict["pos_rot"], field_dict)
